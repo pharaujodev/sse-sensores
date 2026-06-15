@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel SSE - Sensores de Temperatura</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #ffffff;
+            --muted: #64748b;
+            --ok: #16a34a;
+            --warn: #ca8a04;
+            --error: #dc2626;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Arial, Helvetica, sans-serif;
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            color: #0f172a;
+        }
+
+        header {
+            color: #ffffff;
+            padding: 36px 24px 20px;
+            text-align: center;
+        }
+
+        header h1 {
+            margin: 0 0 10px;
+            font-size: 2rem;
+        }
+
+        header p {
+            margin: 0;
+            color: #cbd5e1;
+        }
+
+        main {
+            width: min(1050px, 92vw);
+            margin: 0 auto;
+            padding: 10px 0 40px;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            align-items: center;
+            padding: 16px 18px;
+            margin-bottom: 18px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.20);
+        }
+
+        .status-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: bold;
+        }
+
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--warn);
+            display: inline-block;
+        }
+
+        .dot.connected {
+            background: var(--ok);
+        }
+
+        .dot.closed {
+            background: var(--error);
+        }
+
+        .hint {
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 18px;
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 18px;
+            padding: 22px;
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .sensor-name {
+            margin: 0 0 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--muted);
+            font-size: 0.86rem;
+        }
+
+        .temperature {
+            font-size: 3.2rem;
+            font-weight: bold;
+            margin: 0 0 12px;
+        }
+
+        .updated {
+            color: var(--muted);
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+
+        .log {
+            margin-top: 18px;
+            background: rgba(15, 23, 42, 0.7);
+            color: #e2e8f0;
+            border: 1px solid rgba(226, 232, 240, 0.2);
+            border-radius: 14px;
+            padding: 14px 16px;
+            font-family: Consolas, Monaco, monospace;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 800px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .status-bar {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+<header>
+    <h1>Painel de Temperatura em Tempo Real</h1>
+    <p>Atualização via Server-Sent Events com Spring Boot</p>
+</header>
+
+<main>
+    <section class="status-bar">
+        <div class="status-label">
+            <span id="status-dot" class="dot"></span>
+            <span id="connection-status">Conectando...</span>
+        </div>
+        <div class="hint">Endpoint: <strong>/sensores/stream</strong></div>
+    </section>
+
+    <section class="grid" aria-label="Cards dos sensores">
+        <article class="card" id="card-sala">
+            <h2 class="sensor-name">Sensor sala</h2>
+            <p class="temperature"><span id="valor-sala">--</span>°C</p>
+            <p class="updated" id="tempo-sala">Aguardando primeira leitura...</p>
+        </article>
+
+        <article class="card" id="card-server">
+            <h2 class="sensor-name">Sensor server</h2>
+            <p class="temperature"><span id="valor-server">--</span>°C</p>
+            <p class="updated" id="tempo-server">Aguardando primeira leitura...</p>
+        </article>
+
+        <article class="card" id="card-externo">
+            <h2 class="sensor-name">Sensor externo</h2>
+            <p class="temperature"><span id="valor-externo">--</span>°C</p>
+            <p class="updated" id="tempo-externo">Aguardando primeira leitura...</p>
+        </article>
+    </section>
+
+    <section class="log" id="log">Nenhum evento recebido ainda.</section>
+</main>
+
+<script>
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('connection-status');
+    const log = document.getElementById('log');
+
+    function atualizarEstado(texto, classe) {
+        statusText.textContent = texto;
+        statusDot.className = `dot ${classe || ''}`;
+    }
+
+    function atualizarCard(leitura) {
+        const sensor = leitura.sensor;
+        const valor = document.getElementById(`valor-${sensor}`);
+        const tempo = document.getElementById(`tempo-${sensor}`);
+
+        if (!valor || !tempo) {
+            return;
+        }
+
+        const data = new Date(leitura.timestamp);
+        valor.textContent = Number(leitura.valor).toFixed(1);
+        tempo.textContent = `Última atualização: ${data.toLocaleTimeString('pt-BR')}`;
+        log.textContent = `Evento recebido: ${sensor} = ${Number(leitura.valor).toFixed(1)}°C`;
+    }
+
+    atualizarEstado('Conectando...', '');
+
+    const source = new EventSource('/sensores/stream');
+
+    source.onopen = () => {
+        atualizarEstado('Conectado', 'connected');
+    };
+
+    source.addEventListener('temperatura', (event) => {
+        const leitura = JSON.parse(event.data);
+        atualizarCard(leitura);
+    });
+
+    source.addEventListener('status', (event) => {
+        log.textContent = `Status do servidor: ${event.data}`;
+    });
+
+    source.onerror = () => {
+        if (source.readyState === EventSource.CLOSED) {
+            atualizarEstado('Conexão encerrada', 'closed');
+        } else {
+            atualizarEstado('Reconectando...', '');
+        }
+    };
+
+    window.addEventListener('beforeunload', () => {
+        source.close();
+    });
+</script>
+</body>
+</html>
