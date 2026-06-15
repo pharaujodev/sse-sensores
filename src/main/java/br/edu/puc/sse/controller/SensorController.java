@@ -25,7 +25,7 @@ public class SensorController {
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter stream(
             @RequestHeader(value = "Last-Event-ID", required = false) String ultimoEventoRecebido) {
-        return eventoService.criarConexao();
+        return eventoService.criarConexao(ultimoEventoRecebido);
     }
 
     @GetMapping("/status")

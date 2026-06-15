@@ -15,13 +15,13 @@ import java.util.concurrent.atomic.AtomicLong;
 @Service
 public class EventoService {
 
-    private static final long SEM_TIMEOUT = 0L;
+    private static final long SEM_TIMEOUT = -1L;
     private static final long RECONEXAO_EM_MILISSEGUNDOS = 3000L;
 
     private final List<SseEmitter> emitters = new CopyOnWriteArrayList<>();
     private final AtomicLong contadorEventos = new AtomicLong(0);
 
-    public SseEmitter criarConexao() {
+    public SseEmitter criarConexao(String ultimoEventoRecebido) {
         SseEmitter emitter = new SseEmitter(SEM_TIMEOUT);
 
         emitter.onCompletion(() -> remover(emitter));
@@ -29,7 +29,7 @@ public class EventoService {
         emitter.onError(erro -> remover(emitter));
 
         registrar(emitter);
-        enviarBoasVindas(emitter);
+        enviarBoasVindas(emitter, ultimoEventoRecebido);
 
         return emitter;
     }
@@ -67,12 +67,16 @@ public class EventoService {
         return emitters.size();
     }
 
-    private void enviarBoasVindas(SseEmitter emitter) {
+    private void enviarBoasVindas(SseEmitter emitter, String ultimoEventoRecebido) {
+        String mensagem = ultimoEventoRecebido == null
+                ? "conectado"
+                : "reconectado a partir do evento " + ultimoEventoRecebido;
+
         try {
             emitter.send(SseEmitter.event()
                     .id(String.valueOf(contadorEventos.incrementAndGet()))
                     .name("status")
-                    .data("conectado")
+                    .data(mensagem)
                     .reconnectTime(RECONEXAO_EM_MILISSEGUNDOS));
         } catch (IOException e) {
             remover(emitter);

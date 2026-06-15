@@ -50,8 +50,7 @@
 
         .status-bar {
             display: flex;
-            justify-content: space-between;
-            gap: 16px;
+            justify-content: flex-start;
             align-items: center;
             padding: 16px 18px;
             margin-bottom: 18px;
@@ -81,11 +80,6 @@
 
         .dot.closed {
             background: var(--error);
-        }
-
-        .hint {
-            color: var(--muted);
-            font-size: 0.9rem;
         }
 
         .grid {
@@ -157,7 +151,6 @@
             <span id="status-dot" class="dot"></span>
             <span id="connection-status">Conectando...</span>
         </div>
-        <div class="hint">Endpoint: <strong>/sensores/stream</strong></div>
     </section>
 
     <section class="grid" aria-label="Cards dos sensores">
